@@ -98,7 +98,7 @@ int stringParse(char * buf, int buflen){
   for (int i=0; i<buflen; i++){
     if(buf[i]==0x0F && i+2>=buflen) //error check?
     {
-      DEBUGPORT.println("È");
+      DEBUGPORT.println("E");
     }
     if((buf[i]==0x0F || buf[i]==0x0E) && i+2<buflen) //we detect a command-character and the next two characters exists
     {
@@ -246,6 +246,9 @@ int stringParse(char * buf, int buflen){
       }
     }
   }
+  //Test only
+  //Current[0][0] = 3.0;
+  //Current[1][0] = 4.0;
   return Charger;
 }
 
