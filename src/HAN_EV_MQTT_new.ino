@@ -51,10 +51,10 @@ STARTUP(WiFi.selectAntenna(ANT_EXTERNAL)); // selects the u.FL antenna
 //MQTT setting
 //byte server[] = {192,168,43,249};
 //MQTT client(server, 1883, callback);
-MQTT client("broker.hivemq.com", 1883, callback);
+MQTT client("broker.hivemq.com", 1883, MQTT_DEFAULT_KEEPALIVE, callback, 512);
 //char ID[] = "11111";
 
-//String test = "0";
+String test = "0";
 
 int counter=11;
 MFRC522 mfrc522_Charger1(SS_PIN_CHARGER1, RST_PIN);   // Create MFRC522 instance.
@@ -62,6 +62,8 @@ MFRC522 mfrc522_Charger2(SS_PIN_CHARGER2, RST_PIN);   // Create MFRC522 instance
 unsigned long LatestStartTime[2]={0,0};
 bool handledCharger=0;
 String ShareVar;
+//String Current_Str="0";
+bool TESTCASE=false;
 
 struct EMeter {
     float PhaseVoltage[3];
@@ -138,19 +140,75 @@ void blinkRFIDled(int charger,int action) {
     return;
 }
 
+int activeCharger() {
+    int number = 0;
+    for (int i=0; i<3; i++) {
+        if (Current[0][i] != 0.0) {
+            number += 1;
+            break;
+        }
+    }
+    
+    for (int i=0; i<3; i++) {
+        if (Current[1][i] != 0.0) {
+            number += 2;
+            break;
+        }
+    }
+    
+    return number;
+}
+
+int switchTest(String valueString) {
+    if (valueString == "true") {
+        TESTCASE = true;
+        return 1;
+    }
+    if (valueString == "false") {
+        TESTCASE = false;
+        return 0;
+    }
+}
+
 int maxCurrentC1(String setPointStr) {
     unsigned int setPoint = setPointStr.toInt();
     byte olimexMessage[4] = {0xFE,1,setPoint,0xFF};
-    Serial1.write(olimexMessage,4);
-    DEBUGPORT.println("maxCurrentC1>\tNew setpoint set at "+String(setPoint)+" Amps.");
+    if (!TESTCASE) {
+        Serial1.write(olimexMessage,4);
+        DEBUGPORT.println("maxCurrentC1>\tNew setpoint set at "+String(setPoint)+" Amps.");
+        return 0;
+    }
     return 1;
 }
 
 int maxCurrentC2(String setPointStr) {
     unsigned int setPoint = setPointStr.toInt();
     byte olimexMessage[4] = {0xFE,2,setPoint,0xFF};
-    Serial1.write(olimexMessage,4);
-    DEBUGPORT.println("maxCurrentC2>\tNew setpoint set at "+String(setPoint)+" Amps.");
+    if (!TESTCASE) {
+        Serial1.write(olimexMessage,4);
+        DEBUGPORT.println("maxCurrentC2>\tNew setpoint set at "+String(setPoint)+" Amps.");
+        return 0;
+    }
+    return 1;
+}
+
+int maxCurrentC1_test(int setPoint) {
+    byte olimexMessage[4] = {0xFE,1,setPoint,0xFF};
+    if (TESTCASE) {
+        Serial1.write(olimexMessage,4);
+        DEBUGPORT.println("maxCurrentC1>\tNew setpoint set at "+String(setPoint)+" Amps.");
+        return 0;
+    }
+    return 1;
+}
+
+int maxCurrentC2_test(int setPoint) {
+    byte olimexMessage[4] = {0xFE,2,setPoint,0xFF};
+    if (TESTCASE) {
+        Serial1.write(olimexMessage,4);
+        DEBUGPORT.println("maxCurrentC1>\tNew setpoint set at "+String(setPoint)+" Amps.");
+        return 0;
+    }
     return 1;
 }
 /*
@@ -185,7 +243,7 @@ int getUserIdAtSocket(int socket) {
 
 void getUsers(String input) {
 	//input is not used anymore!
-	client.publish("getUsers", "get");
+	client.publish("HANevse/getUsers", "get");
 	
 }
 
@@ -380,20 +438,49 @@ void getMeasure_callback(byte* payload, unsigned int length) {
     //DEBUGPORT.println(time);
     DEBUGPORT.print("MQTT>\tReceive energy meter data from broker at: ");
     DEBUGPORT.println(Time.format(time, TIME_FORMAT_DEFAULT));
+    
+    //Current_Str = String((int)(EMeterData[2].PhaseCurrent[0]));
+    
+    //Send current to OLIMEX
+    /*
+    if (AUTHENTICATION_CAR1) {
+        if (AUTHENTICATION_CAR2) {
+            maxCurrentC1_test((int)(EMeterData[2].PhaseCurrent[0]/2)); //Emeter3, I1
+            maxCurrentC2_test((int)(EMeterData[2].PhaseCurrent[0]/2)); //Emeter3, I1
+        }
+        else
+            maxCurrentC1_test((int)(EMeterData[2].PhaseCurrent[0])); //Emeter3, I1
+    }
+    else {
+        if (AUTHENTICATION_CAR2) {
+            maxCurrentC2_test((int)(EMeterData[2].PhaseCurrent[0])); //Emeter3, I1
+        }
+    }
+    */
+    if (activeCharger()==1) {
+        maxCurrentC1_test((int)(EMeterData[2].PhaseCurrent[0])); //Emeter3, I1
+    }
+    else if (activeCharger()==2) {
+        maxCurrentC2_test((int)(EMeterData[2].PhaseCurrent[0])); //Emeter3, I1
+    }
+    else {
+        maxCurrentC1_test((int)(EMeterData[2].PhaseCurrent[0]/2)); //Emeter3, I1
+        maxCurrentC2_test((int)(EMeterData[2].PhaseCurrent[0]/2)); //Emeter3, I1
+    }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
-    //test = "99";
-	if (strcmp(topic, "UserList")==0) {
-	    //test = "1";
+    test = "99";
+	if (strcmp(topic, "HANevse/UserList")==0) {
+	    test = "1";
 		getUsers_callback(payload, length);
 	}
-	else if (strcmp(topic, "UpdateUser")==0) {
-	    //test = "2";
+	else if (strcmp(topic, "HANevse/UpdateUser")==0) {
+	    test = "2";
 		getUpdate_callback(payload, length);
 	}
-	else if (strcmp(topic, "EnergyMeter")==0) {
-	    //test = "3";
+	if (strcmp(topic, "HANevse/EnergyMeter")==0) {
+	    test = "3";
 	    getMeasure_callback(payload, length);
 	}
 	time_t time = Time.now();
@@ -407,7 +494,7 @@ void updateUser(int UserId, int SocketId, unsigned long StartTime){
     Body = String(UserId) + "%" + String(SocketId) + "%" + String(StartTime)+"%"; 
     
     for(int i=0;i<3;i++) {
-        if(client.publish("UpdateUser", Body)) {
+        if(client.publish("HANevse/UpdateUser", Body)) {
             break;
         }
     }
@@ -425,7 +512,7 @@ void add_Measurement(float phaseVoltageL1, float phaseVoltageL2, float phaseVolt
 	String Body = String(phaseVoltageL1, 2) + "%" + String(phaseVoltageL2, 2) + "%" + String(phaseVoltageL3, 2) + "%" + String(currentL1, 2) + "%" + String(currentL2, 2) + "%" + String(currentL3, 2) + "%" + String(Power, 2) + "%" + String(Energy, 2) + "%" + String(Frequency, 2) + "%" + String(Timestamp) + socketStr + userStr + "%";
 	
 	for(int i=0; i<3; i++) {
-		if(client.publish("photonMeasure", Body)) {
+		if(client.publish("HANevse/photonMeasure", Body)) {
 			break;
 		}
 	}
@@ -736,9 +823,10 @@ void reconnect(void) {
         DEBUGPORT.print("MQTT>\tConnecting to MQTT broker...");
         if (client.connect("EV-Photon1")) {
             DEBUGPORT.println("MQTT>\tConnected");
-            client.subscribe("UserList", client.QOS2);
-            client.subscribe("UpdateUser", client.QOS2);
-            client.subscribe("EnergyMeter", client.QOS2);
+            //client.subscribe("HANevse/#", client.QOS2);
+            client.subscribe("HANevse/EnergyMeter", client.QOS2);
+            client.subscribe("HANevse/UpdateUser", client.QOS2);
+            client.subscribe("HANevse/UserList", client.QOS2);
         }
         else {
             DEBUGPORT.println("MQTT>\tConnection failed");
@@ -782,6 +870,7 @@ void setup() {
     //Particle.process();
     
 	//Particle.function("getUsers",getUsers);
+	Particle.function("switchTest",switchTest);
     Particle.function("maxCurrentC1",maxCurrentC1);
     Particle.function("maxCurrentC2",maxCurrentC2);
     Particle.function("forceUIDsoc1",forceUIDsoc1);
@@ -799,7 +888,8 @@ void setup() {
     Particle.variable("EVListStr", EVListStr);
     Particle.variable("currentStr",currentStr);
     Particle.variable("ShareVar",ShareVar);
-    //Particle.variable("Topic", test);
+    //Particle.variable("Current", Current_Str);
+    Particle.variable("Topic", test);
     Particle.process();
 	
 	getUsers("");
@@ -884,11 +974,12 @@ void loop() {
 		
 		String EVStr = "";
 		for (int i = 0; i<SIZEOFUSERLIST; i++) {
-		    EVStr = EVStr + EVUserlist[0].Owner+" "+String(EVUserlist[0].PendingCharger)+" "+String(EVUserlist[0].StartTime)+"; ";
+		    EVStr = EVStr + String(EVUserlist[0].Id)+" "+EVUserlist[0].Owner+" "+String(EVUserlist[0].PendingCharger)+" "+String(EVUserlist[0].StartTime)+"; ";
 		}
-		EVListStr = "";
+		EVListStr = EVStr;
     }
     counter++;
+		
     // store new measurement value if it is received correctly from energymeter (via the Olimex).
     if(millis()>nextTime[handledCharger] && (Charger==1+CHARGEROFFSET || Charger==2+CHARGEROFFSET)) 
     {
