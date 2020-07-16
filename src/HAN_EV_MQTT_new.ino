@@ -22,8 +22,8 @@ void reconnect(void);
 void callback(char* topic, byte* payload, unsigned int length);
 void charToString(const char in[], String &out);
 
-String UIDtagCharger1;
-String UIDtagCharger2;
+String UIDtagCharger1="No ID";
+String UIDtagCharger2="No ID";
 
 #define CHARGEROFFSET 0 //use 0 for socket 1 and 2, use 2 for socket 3 and 4, etc.
 #define DEBUGPORT Serial
@@ -89,7 +89,6 @@ struct EVUser {
 };
 
 EMeter EMeterData[NUMBEROFMETERS];
-EVUser EVUserlist[SIZEOFUSERLIST];
 String EVListStr="";
 String currentStr="";
 unsigned int nextTime[2] = {30000,30000};    // Next time to contact the server
@@ -241,146 +240,6 @@ String getUserIdAtSocket(int socket) {
     return "00";
 }
 
-void getUsers(String input) {
-	//input is not used anymore!
-	client.publish("HANevse/getUsers", "get");
-	
-}
-
-void getUsers_callback(byte* payload, unsigned int length) {
-	String data;
-    int from = 0;
-    int to = 0;
-    
-    char p[length + 1];
-    memcpy(p, payload, length);
-    
-    p[length] = NULL;
-
-    charToString(p, data);
-    for (int i=0; i<SIZEOFUSERLIST; i++) {
-        //Read User ID
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].Id = (data.substring(from, to)).toInt();
-        to++;
-        from = to;
-        //Read CarBrand
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].CarBrand = data.substring(from, to);
-        to++;
-        from = to;
-        //Read CarType
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].CarType = data.substring(from, to);
-        to++;
-        from = to;
-        //Read CarYear
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].CarYear = (data.substring(from, to)).toInt();
-        to++;
-        from = to;
-        //Read Owner
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].Owner = data.substring(from, to);
-        to++;
-        from = to;
-        //Read BatteryCapacity
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].BatteryCapacity = (data.substring(from, to)).toFloat();
-        to++;
-        from = to;
-        //Read UIDtag
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].UIDtag = data.substring(from, to);
-        to++;
-        from = to;
-        //Read PendingCharger
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].PendingCharger = (data.substring(from, to)).toInt();
-        to++;
-        from = to;
-        //Read StartTime
-        while (data[to]!='%') {
-            to++;
-        }
-        EVUserlist[i].StartTime = atol((data.substring(from, to)).c_str());
-        to++;
-        from = to;
-    }
-    //Testing purpose only
-    //DEBUGPORT.println(EVUserlist[1].Owner);
-    time_t time = Time.now();
-    //DEBUGPORT.println(time);
-    DEBUGPORT.print("MQTT>\tReceive EV user list from broker at: ");
-    DEBUGPORT.println(Time.format(time, TIME_FORMAT_DEFAULT));
-}
-
-void getUpdate_callback(byte* payload, unsigned int length) {
-	String data;
-	int userId;
-	int SocketId;
-	unsigned long Stime;
-    int from = 0;
-    int to = 0;
-    
-    char p[length + 1];
-    memcpy(p, payload, length);
-    
-    p[length] = NULL;
-    
-    charToString(p, data);
-	
-	//Read User Id
-    while (data[to]!='%') {
-        to++;
-    }
-    userId = (data.substring(from, to)).toInt();
-    to++;
-    from = to;
-	//Read Socket ID
-    while (data[to]!='%') {
-        to++;
-    }
-    SocketId = (data.substring(from, to)).toInt();
-    to++;
-    from = to;
-	//Read start time
-    while (data[to]!='%') {
-        to++;
-    }
-    Stime = atol((data.substring(from, to)).c_str());
-    to++;
-    from = to;
-
-	for(int i=0; i<SIZEOFUSERLIST; i++) {
-		if (EVUserlist[i].Id == userId) {
-			EVUserlist[i].PendingCharger = SocketId;
-			EVUserlist[i].StartTime = Stime;
-			break;
-		}
-	}
-	time_t time = Time.now();
-    //DEBUGPORT.println(time);
-    DEBUGPORT.print("MQTT>\tUpdate EV user list from broker at: ");
-    DEBUGPORT.println(Time.format(time, TIME_FORMAT_DEFAULT));
-}
-
 void getMeasure_callback(byte* payload, unsigned int length) {
     String data;
     int from = 0;
@@ -458,46 +317,27 @@ void getMeasure_callback(byte* payload, unsigned int length) {
     }
     */
     if (activeCharger()==1) {
-        maxCurrentC1_test((int)(EMeterData[2].PhaseCurrent[0])); //Emeter3, I1
+        maxCurrentC1_test((int)(EMeterData[2].PhaseCurrent[0]+EMeterData[2].PhaseCurrent[1]+EMeterData[2].PhaseCurrent[2])); //Emeter3, I1
     }
     else if (activeCharger()==2) {
-        maxCurrentC2_test((int)(EMeterData[2].PhaseCurrent[0])); //Emeter3, I1
+        maxCurrentC2_test((int)(EMeterData[2].PhaseCurrent[0]+EMeterData[2].PhaseCurrent[1]+EMeterData[2].PhaseCurrent[2])); //Emeter3, I1
     }
     else {
-        maxCurrentC1_test((int)(EMeterData[2].PhaseCurrent[0]/2)); //Emeter3, I1
-        maxCurrentC2_test((int)(EMeterData[2].PhaseCurrent[0]/2)); //Emeter3, I1
+        maxCurrentC1_test((int)((EMeterData[2].PhaseCurrent[0]+EMeterData[2].PhaseCurrent[1]+EMeterData[2].PhaseCurrent[2])/2)); //Emeter3, I1
+        maxCurrentC2_test((int)((EMeterData[2].PhaseCurrent[0]+EMeterData[2].PhaseCurrent[1]+EMeterData[2].PhaseCurrent[2])/2)); //Emeter3, I1
     }
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
     test = "99";
-	if (strcmp(topic, "HANevse/UserList")==0) {
-	    test = "1";
-		getUsers_callback(payload, length);
-	}
-	else if (strcmp(topic, "HANevse/UpdateUser")==0) {
-	    test = "2";
-		getUpdate_callback(payload, length);
-	}
 	if (strcmp(topic, "HANevse/EnergyMeter")==0) {
-	    test = "3";
+	    test = "1";
 	    getMeasure_callback(payload, length);
 	}
 	time_t time = Time.now();
     //DEBUGPORT.println(time);
     DEBUGPORT.print("MQTT>\tCallback function is called at: ");
     DEBUGPORT.println(Time.format(time, TIME_FORMAT_DEFAULT));
-}
-
-void updateUser(int UserId, int SocketId, unsigned long StartTime){
-    String Body = "";
-    Body = String(UserId) + "%" + String(SocketId) + "%" + String(StartTime)+"%"; 
-    
-    for(int i=0;i<3;i++) {
-        if(client.publish("HANevse/UpdateUser", Body)) {
-            break;
-        }
-    }
 }
 
 void add_Measurement(float phaseVoltageL1, float phaseVoltageL2, float phaseVoltageL3, float currentL1, float currentL2, float currentL3,  float Power, float Energy, float Frequency, unsigned long Timestamp, int socketId=0, String userId="00") {
@@ -516,102 +356,6 @@ void add_Measurement(float phaseVoltageL1, float phaseVoltageL2, float phaseVolt
 			break;
 		}
 	}
-}
-
-int forceUIDsoc1(String UID) {
-    return testUser("K"+UID,1+CHARGEROFFSET);  
-}
-
-int forceUIDsoc2(String UID) {
-    return testUser("K"+UID,2+CHARGEROFFSET);  
-}
-
-int authUserId(String Id, int socket) {
-    //parse id string to int
-    int UserId = Id.toInt();
-    
-    //see if anyone is charging here and stop that
-    unauthSocket(String(socket,DEC));
-    
-    //now find new user 
-    int k;
-    for(k=0;k<SIZEOFUSERLIST;k++)
-    {
-      if(EVUserlist[k].Id == UserId)
-      {
-          break;
-      }
-    }
-    
-    //and take a new user
-    EVUserlist[k].PendingCharger=socket+CHARGEROFFSET;
-    EVUserlist[k].StartTime=Time.now();
-    //Authorized=true;
-    if (socket==1)
-    {
-        digitalWrite(AUTHENTICATION_CAR1,HIGH);
-        LatestStartTime[0]=Time.now();
-        blinkRFIDled(1,1);
-    }
-    if (socket==2)
-    {
-        digitalWrite(AUTHENTICATION_CAR2,HIGH);
-        //digitalWrite(D7,HIGH);
-        LatestStartTime[1]=Time.now();
-        blinkRFIDled(2,1);
-    }
-    updateUser(EVUserlist[k].Id,EVUserlist[k].PendingCharger,EVUserlist[k].StartTime);
-    DEBUGPORT.println("Authorized access charger"+String(EVUserlist[k].PendingCharger,DEC)+": "+EVUserlist[k].Owner+" "+EVUserlist[k].CarBrand+" "+String(EVUserlist[k].CarYear)+" with "+String(EVUserlist[k].BatteryCapacity,1)+" kWh @time "+String(EVUserlist[k].StartTime));
-    DEBUGPORT.println(String(EVUserlist[k].Id)+"&pendingcharger="+String(EVUserlist[k].PendingCharger)+"&starttime="+String(EVUserlist[k].StartTime));
-    DEBUGPORT.println();
-    //return testUser("K"+UID,1+CHARGEROFFSET);      
-    return socket;
-}
-
-int authUserSoc1(String Id) {
-    return authUserId(Id,1);
-}
-
-int authUserSoc2(String Id) {
-    return authUserId(Id,2);
-}
-
-int unauthSocket(String input) {
-    //parse input string to int
-    int socket = input.toInt() % 2;
-    if (socket == 0) { socket = 2;}
-    //DEBUGPORT.println("unauthorizeSocket called with argument: "+String(socket));
-    //loop over the userlist and find the corresponding user
-    int k;
-    for(k=0;k<SIZEOFUSERLIST;k++)
-    {
-      if(EVUserlist[k].PendingCharger == socket)
-      {
-          break;
-      }
-    }
-    // stop charging
-    //DEBUGPORT.println("STOP CHARGEING");
-    //DEBUGPORT.print("Stop new charge because charger " + String(EVUserlist[k].PendingCharger) +"==" + String(Charger) +" starttime in EVuserlist " + String(EVUserlist[k].StartTime) + " now= " + String( Time.now()));
-    EVUserlist[k].PendingCharger=0;
-    EVUserlist[k].StartTime = Time.now();
-    //Authorized=true;
-    if (socket==1)
-    {
-        digitalWrite(AUTHENTICATION_CAR1,LOW);
-    }
-    //(Charger==2+CHARGEROFFSET)
-    //take socket==0 because of modulo 2 arithmetic
-    if (socket==2 || socket == 0)
-    {
-        digitalWrite(AUTHENTICATION_CAR2,LOW);
-        //digitalWrite(D7,LOW);
-    }
-    blinkRFIDled(socket,4);
-    //DEBUGPORT.println("EVuserlist[k].StartTime set to "+String(EVUserlist[k].StartTime)); 
-    updateUser(EVUserlist[k].Id,EVUserlist[k].PendingCharger,EVUserlist[k].StartTime);
-    //DEBUGPORT.println(String(EVUserlist[k].Id)+"&pendingcharger="+String(EVUserlist[k].PendingCharger)+"&starttime="+String(EVUserlist[k].StartTime));
-    return socket;         
 }
 
 int initRFID(String input) {
@@ -634,124 +378,6 @@ int initRFID(String input) {
     DEBUGPORT.println("Approximate your card to the reader...");
     DEBUGPORT.println();    
     return 1;
-}
-
-bool testUser(String content, int Charger) {
-    bool Authorized=false;
-    DEBUGPORT.println();
-    DEBUGPORT.print("Message : ");
-
-    content.toUpperCase();
-  //bool Authorized_Charger1=false;
-    for (int k=0;k<SIZEOFUSERLIST;k++)
-    {
-      DEBUGPORT.println(k, DEC);
-      if (content.substring(1) == EVUserlist[k].UIDtag) //Remove?????
-      {
-        if (EVUserlist[k].PendingCharger==0) //if the user is not charging
-        {
-            //see if someone else is charging here
-            bool ChargerIsOccupied=false;
-            for(int j=0;j<SIZEOFUSERLIST;j++)
-            {
-                if (EVUserlist[j].PendingCharger == Charger)
-                {
-                    ChargerIsOccupied=true; 
-                }
-            }
-            //if charger is not occupied, take new user
-            if(!ChargerIsOccupied && (EVUserlist[k].StartTime + 20 < Time.now()))
-            {
-                DEBUGPORT.println("Start new charge because charger occupied: " + String(ChargerIsOccupied) + " starttime in EVuserlist " + String(EVUserlist[k].StartTime) + " now= " + String( Time.now()));
-                EVUserlist[k].PendingCharger=Charger;
-                EVUserlist[k].StartTime=Time.now();
-                Authorized=true;
-                if (Charger==1+CHARGEROFFSET)
-                {
-                    digitalWrite(AUTHENTICATION_CAR1,HIGH);
-                    LatestStartTime[0]=Time.now();
-                    blinkRFIDled(1,1);
-                }
-                if (Charger==2+CHARGEROFFSET)
-                {
-                    digitalWrite(AUTHENTICATION_CAR2,HIGH);
-                    //digitalWrite(D7,HIGH);
-                    LatestStartTime[1]=Time.now();
-                    blinkRFIDled(2,1);
-                }
-                updateUser(EVUserlist[k].Id,EVUserlist[k].PendingCharger,EVUserlist[k].StartTime);
-                DEBUGPORT.println("Authorized access charger"+String(EVUserlist[k].PendingCharger,DEC)+": "+EVUserlist[k].Owner+" "+EVUserlist[k].CarBrand+" "+String(EVUserlist[k].CarYear)+" with "+String(EVUserlist[k].BatteryCapacity,1)+" kWh @time "+String(EVUserlist[k].StartTime));
-                DEBUGPORT.println(String(EVUserlist[k].Id)+"&pendingcharger="+String(EVUserlist[k].PendingCharger)+"&starttime="+String(EVUserlist[k].StartTime));
-                DEBUGPORT.println();
-                //delay(3000);
-            }
-            else
-            {
-                DEBUGPORT.println("Charger is occupied or you did a second try to start charging within 20sec.");
-                
-                if(!ChargerIsOccupied)
-                {
-                    //
-                    blinkRFIDled(Charger-CHARGEROFFSET,2);
-                }
-                else
-                {
-                    blinkRFIDled(Charger-CHARGEROFFSET,3);
-                }
-            }
-        }
-        else
-        {
-            DEBUGPORT.println("You are allready charging at charger "+String(EVUserlist[k].PendingCharger,DEC));
-            if(EVUserlist[k].PendingCharger == Charger && (EVUserlist[k].StartTime + 20 < Time.now()))
-            {
-                //you swiped the card on the charger where you are charging--> stop charging
-                DEBUGPORT.println("STOP CHARGEING");
-                DEBUGPORT.print("Stop new charge because charger " + String(EVUserlist[k].PendingCharger) +"==" + String(Charger) +" starttime in EVuserlist " + String(EVUserlist[k].StartTime) + " now= " + String( Time.now()));
-                EVUserlist[k].PendingCharger=0;
-                EVUserlist[k].StartTime = Time.now();
-                Authorized=true;
-                if (Charger==1+CHARGEROFFSET)
-                {
-                    digitalWrite(AUTHENTICATION_CAR1,LOW);
-                }
-                if (Charger==2+CHARGEROFFSET)
-                {
-                    digitalWrite(AUTHENTICATION_CAR2,LOW);
-                    //digitalWrite(D7,LOW);
-                }
-                blinkRFIDled(Charger-CHARGEROFFSET,4);
-                DEBUGPORT.println("EVuserlist[k].StartTime set to "+String(EVUserlist[k].StartTime)); 
-                updateUser(EVUserlist[k].Id,EVUserlist[k].PendingCharger,EVUserlist[k].StartTime);
-                DEBUGPORT.println(String(EVUserlist[k].Id)+"&pendingcharger="+String(EVUserlist[k].PendingCharger)+"&starttime="+String(EVUserlist[k].StartTime));
-                
-            }
-            else
-            {
-                if(EVUserlist[k].PendingCharger == Charger)
-                {
-                    blinkRFIDled(Charger-CHARGEROFFSET,5);
-                }
-                else
-                {
-                    blinkRFIDled(Charger-CHARGEROFFSET,6);
-                }
-            }
-        }
-
-      }
-     
-     else   {
-        DEBUGPORT.println(" Try next user");
-        //delay(3000);
-      }
-      if(EVUserlist[k].CarYear==0 || Authorized==true)
-      {
-          blinkRFIDled(Charger-CHARGEROFFSET,7);
-          break;
-      }
-    } 
-    return Authorized;
 }
 
 bool readRFIDCard(int Charger) {
@@ -816,10 +442,6 @@ bool readRFIDCard(int Charger) {
     return Authorized;
 }
 
-int funcName(String extra) {
-    return 0;
-}
-
 void reconnect(void) {
     while (!client.isConnected()) {
         DEBUGPORT.print("MQTT>\tConnecting to MQTT broker...");
@@ -827,8 +449,6 @@ void reconnect(void) {
             DEBUGPORT.println("MQTT>\tConnected");
             //client.subscribe("HANevse/#", client.QOS2);
             client.subscribe("HANevse/EnergyMeter", client.QOS2);
-            client.subscribe("HANevse/UpdateUser", client.QOS2);
-            client.subscribe("HANevse/UserList", client.QOS2);
         }
         else {
             DEBUGPORT.println("MQTT>\tConnection failed");
@@ -841,7 +461,6 @@ void reconnect(void) {
 void setup() {
     DEBUGPORT.begin(115200); 
     Serial1.begin(9600);
-    //Particle.function("funcKey", funcName);
     //DEBUGPORT.println(Voltage,5);
     //DEBUGPORT.println(String(Voltage,5));
     
@@ -863,61 +482,28 @@ void setup() {
     
     initRFID("");
     
-    for(int i=0;i<SIZEOFUSERLIST;i++)
-    {
-       EVUserlist[i]={0,"","",0,"",0,"",0,0};  
-    }
     //Particle.process();
     //resetOlimex("");
     //Particle.process();
-    
-	//Particle.function("getUsers",getUsers);
+
 	Particle.function("switchTest",switchTest);
     Particle.function("maxCurrentC1",maxCurrentC1);
     Particle.function("maxCurrentC2",maxCurrentC2);
-    //Particle.function("forceUIDsoc1",forceUIDsoc1); //Remove because cannot check the database anymore
-    //Particle.function("forceUIDsoc2",forceUIDsoc2); //Remove because cannot check the database anymore
     Particle.function("resetOlimex",resetOlimex);
     Particle.function("progModeOlmx",progModeOlmx);
-    //Particle.function("unauthSocket",unauthSocket); //Remove because cannot check the database anymore
     Particle.function("resetParticl",resetParticl);
-    //Particle.function("authUserSoc1",authUserSoc1); //Remove because cannot check the database anymore
-    //Particle.function("authUserSoc2",authUserSoc2); //Remove because cannot check the database anymore
     //Particle.function("AuthPinsHigh",AuthPinsHigh);
     //Particle.function("AuthPinsLow",AuthPinsLow);
     Particle.function("WifiSignal",WifiSignal);
     Particle.function("initRFID",initRFID);
-    //Particle.variable("EVListStr", EVListStr); //Remove because cannot check the database anymore
     Particle.variable("currentStr",currentStr);
     Particle.variable("ShareVar",ShareVar);
     //Particle.variable("Current", Current_Str);
     Particle.variable("Topic", test);
     Particle.process();
 	
-	getUsers("");
-
-    //EVUserlist[0]={0,"Nissan","Leaf", 2011, "Yuri", 21.2, "97 2D 39 5D",0,0};
-    //EVUserlist[1]={1,"Tesla","model S", 2016, "Trung", 85.0, "04 4E 79 EA FA 4D 80",0,0};
-    //EVUserlist[0]={"Nissan Leaf", 2011, "Yuri", 21.2, "97 2D 39 5D",0,0};
-    //EVUserlist[1]={"Tesla model S", 2016, "Trung", 85.0, "04 4E 79 EA FA 4D 80",0,0};
-    //DEBUGPORT.println(EVUserlist[0].Owner);
-    //DEBUGPORT.println(EVUserlist[1].Owner);
-    //DEBUGPORT.println(EVUserlist[2].Owner);         
-    //DEBUGPORT.println(EVUserlist[3].Owner);
-	
 	RGB.control(true);
     Time.zone(1); //Dutch time zone
-    
-    //NO NEED, the photon will connect to the broker
-    //client.connect("EV-Photon1");//Connect to the broker
-    
-    //if (client.isConnected()) {
-        //test = "3";
-    //    client.subscribe("UserList");
-        //test = "4";
-	//	client.subscribe("updateUser");
-    //    RGB.color(0, 255, 0); //Green led
-    //}
 }
 
 void loop() {
@@ -939,47 +525,9 @@ void loop() {
     int Charger = readSerialOlimex()+CHARGEROFFSET;
     Particle.process();
     if(counter>10){
-        //unsigned long temptime = EVUserlist[0].StartTime%10;
-        //char buffer[15];
-        //sprintf(buffer,"%ld", EVUserlist[0].StartTime);
-        //DEBUGPORT.print(buffer);
-        //DEBUGPORT.println(" "+String(temptime));
-		//DEBUGPORT.print("Userlist>\t");DEBUGPORT.print(EVUserlist[0].Id);DEBUGPORT.print("-");DEBUGPORT.print(EVUserlist[0].Owner);DEBUGPORT.print(EVUserlist[0].UIDtag);DEBUGPORT.print("-");DEBUGPORT.print(EVUserlist[0].PendingCharger);DEBUGPORT.print("-");DEBUGPORT.println(EVUserlist[0].StartTime,DEC);
-		//DEBUGPORT.print("Userlist>\t");DEBUGPORT.print(EVUserlist[1].Owner);DEBUGPORT.print(EVUserlist[1].UIDtag);DEBUGPORT.print("-");DEBUGPORT.print(EVUserlist[1].PendingCharger);DEBUGPORT.print("-");DEBUGPORT.println(String(EVUserlist[1].StartTime));
-		//DEBUGPORT.print("Userlist>\t");DEBUGPORT.print(EVUserlist[2].Owner);DEBUGPORT.print(EVUserlist[2].UIDtag);DEBUGPORT.print("-");DEBUGPORT.print(EVUserlist[2].PendingCharger);DEBUGPORT.print("-");DEBUGPORT.println(String(EVUserlist[2].StartTime));
 		counter = 0;
 		DEBUGPORT.println("LatestStartTime>\t"+String(LatestStartTime[0])+", "+String(LatestStartTime[1]));
 		DEBUGPORT.println(String(Current[1][0]+ Current[1][1]+ Current[1][2]));
-		
-		//EVListStr = 
-		//EVUserlist[0].Owner+" "+String(EVUserlist[0].PendingCharger)+" "+String(EVUserlist[0].StartTime)+"; "+
-		//EVUserlist[1].Owner+" "+String(EVUserlist[1].PendingCharger)+" "+String(EVUserlist[1].StartTime)+"; "+
-		//EVUserlist[2].Owner+" "+String(EVUserlist[2].PendingCharger)+" "+String(EVUserlist[2].StartTime)+"; "+
-		//EVUserlist[3].Owner+" "+String(EVUserlist[3].PendingCharger)+" "+String(EVUserlist[3].StartTime)+"; "+
-		//EVUserlist[4].Owner+" "+String(EVUserlist[4].PendingCharger)+" "+String(EVUserlist[4].StartTime)+"; "+
-		//EVUserlist[5].Owner+" "+String(EVUserlist[5].PendingCharger)+" "+String(EVUserlist[5].StartTime)+"; "+
-		//EVUserlist[6].Owner+" "+String(EVUserlist[6].PendingCharger)+" "+String(EVUserlist[6].StartTime)+"; "+
-		//EVUserlist[7].Owner+" "+String(EVUserlist[7].PendingCharger)+" "+String(EVUserlist[7].StartTime)+"; "+
-		//EVUserlist[8].Owner+" "+String(EVUserlist[8].PendingCharger)+" "+String(EVUserlist[8].StartTime)+"; "+
-		//EVUserlist[9].Owner+" "+String(EVUserlist[9].PendingCharger)+" "+String(EVUserlist[9].StartTime)+"; "+
-		//EVUserlist[10].Owner+" "+String(EVUserlist[10].PendingCharger)+" "+String(EVUserlist[10].StartTime)+"; "+
-		//EVUserlist[11].Owner+" "+String(EVUserlist[11].PendingCharger)+" "+String(EVUserlist[11].StartTime)+"; "+
-		//EVUserlist[12].Owner+" "+String(EVUserlist[12].PendingCharger)+" "+String(EVUserlist[12].StartTime)+"; "+
-		//EVUserlist[13].Owner+" "+String(EVUserlist[13].PendingCharger)+" "+String(EVUserlist[13].StartTime)+"; "+
-		//EVUserlist[14].Owner+" "+String(EVUserlist[14].PendingCharger)+" "+String(EVUserlist[14].StartTime)+"; "+
-		//EVUserlist[15].Owner+" "+String(EVUserlist[15].PendingCharger)+" "+String(EVUserlist[15].StartTime)+"; "+
-		//EVUserlist[16].Owner+" "+String(EVUserlist[16].PendingCharger)+" "+String(EVUserlist[16].StartTime)+"; "+
-		//EVUserlist[17].Owner+" "+String(EVUserlist[17].PendingCharger)+" "+String(EVUserlist[17].StartTime)+"; "+
-		//EVUserlist[18].Owner+" "+String(EVUserlist[18].PendingCharger)+" "+String(EVUserlist[18].StartTime)+"; "+
-		//EVUserlist[19].Owner+" "+String(EVUserlist[19].PendingCharger)+" "+String(EVUserlist[19].StartTime)+"; "+
-		//EVUserlist[20].Owner+" "+String(EVUserlist[20].PendingCharger)+" "+String(EVUserlist[20].StartTime)+"; ";
-		/*
-		String EVStr = "";
-		for (int i = 0; i<SIZEOFUSERLIST; i++) {
-		    EVStr = EVStr + String(EVUserlist[0].Id)+" "+EVUserlist[0].Owner+" "+String(EVUserlist[0].PendingCharger)+" "+String(EVUserlist[0].StartTime)+"; ";
-		}
-		EVListStr = EVStr;
-        */
     }
     counter++;
 		
@@ -990,9 +538,10 @@ void loop() {
         //getUserIdAtSocket(Charger)
         int tempCharger = Charger;
         Charger = handledCharger + 1;
-        if(getUserIdAtSocket(Charger) != "00") //Replace Charger+CHARGEROFFSET by Charger?
+        if(((activeCharger()==Charger) || (activeCharger() == 3)) && (getUserIdAtSocket(Charger)!="00"))
         {
-            add_Measurement(PhaseVoltage[Charger-1][0], PhaseVoltage[Charger-1][1], PhaseVoltage[Charger-1][2], Current[Charger-1][0], Current[Charger-1][1], Current[Charger-1][2], Power[Charger-1][0]+Power[Charger-1][1]+Power[Charger-1][2], Energy[Charger-1], Frequency[Charger-1], Time.now(), Charger, getUserIdAtSocket(Charger));
+            //getUserIdAtSocket(Charger+CHARGEROFFSET);
+            add_Measurement(PhaseVoltage[Charger-1][0], PhaseVoltage[Charger-1][1], PhaseVoltage[Charger-1][2], Current[Charger-1][0], Current[Charger-1][1], Current[Charger-1][2], Power[Charger-1][0]+Power[Charger-1][1]+Power[Charger-1][2], Energy[Charger-1], Frequency[Charger-1], Time.now(), Charger+CHARGEROFFSET, getUserIdAtSocket(Charger+CHARGEROFFSET));
         }
         Charger = tempCharger;
         nextTime[handledCharger] = millis() + 30000; //every 30 sec
@@ -1014,21 +563,6 @@ void loop() {
         //timeout with current almost zero
         DEBUGPORT.println("Timeout charger"+String(CHARGEROFFSET+1));
         digitalWrite(AUTHENTICATION_CAR1,LOW);
-        /*
-        for(int j=0;j<SIZEOFUSERLIST;j++)
-        {
-            if (EVUserlist[j].PendingCharger == 1+CHARGEROFFSET)
-            {
-                Particle.process();
-                DEBUGPORT.println("user1 at index: "+String(j,DEC));
-                EVUserlist[j].PendingCharger=0;
-                //EVUserlist[j].StartTime = Time.now();//if you didnot connect within 20s, you are allowed to checkin immediately
-                //updateUser(EVUserlist[j].Id,EVUserlist[j].PendingCharger,EVUserlist[j].StartTime);
-                break;
-            }
-            
-        }
-        */
         LatestStartTime[0]=2147483548;
     }
     //DEBUGPORT.println(Current[1][0]+ Current[1][1]+ Current[1][2],4);
@@ -1041,22 +575,6 @@ void loop() {
         DEBUGPORT.println("Timeout charger"+String(CHARGEROFFSET+2));
         digitalWrite(AUTHENTICATION_CAR2,LOW);
         //digitalWrite(D7,LOW);
-        /*
-        for(int j=0;j<SIZEOFUSERLIST;j++)
-        {
-            if (EVUserlist[j].PendingCharger == 2+CHARGEROFFSET)
-            {
-                Particle.process();
-                DEBUGPORT.println("user2 at index: "+String(j,DEC));
-                EVUserlist[j].PendingCharger=0;
-                //EVUserlist[j].StartTime = Time.now(); //if you didnot connect within 20s, you are allowed to checkin immediately
-                updateUser(EVUserlist[j].Id,EVUserlist[j].PendingCharger,EVUserlist[j].StartTime);
-                DEBUGPORT.println(String(EVUserlist[j].Id)+"&pendingcharger="+String(EVUserlist[j].PendingCharger)+"&starttime="+String(EVUserlist[j].StartTime));
-                break;
-            }
-            
-        }
-        */
         LatestStartTime[1]=2147483548;
         //DEBUGPORT.println("Timeout charger2");
     }
@@ -1079,5 +597,12 @@ void loop() {
     //{
     //  delay(100);
     //}
+    
+    //Reset the UIDtag if there is no car charging
+    if ((activeCharger()!=1)&&(activeCharger()!=3))
+        UIDtagCharger1="No ID";
+    if ((activeCharger()!=2)&&(activeCharger()!=3))
+        UIDtagCharger2="No ID";
+            
     handledCharger = !handledCharger;
 }
